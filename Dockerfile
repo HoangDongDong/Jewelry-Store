@@ -7,7 +7,7 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:17-jdk-slim
+FROM amazoncorretto:17-alpine-jdk
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
