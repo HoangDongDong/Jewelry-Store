@@ -1,0 +1,443 @@
+USE master;
+GO
+
+IF EXISTS (SELECT name FROM sys.databases WHERE name = N'JewelryStoreDB')
+BEGIN
+    ALTER DATABASE JewelryStoreDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE JewelryStoreDB;
+END
+GO
+
+CREATE DATABASE JewelryStoreDB;
+GO
+
+USE JewelryStoreDB;
+GO
+
+-- ========================
+-- ACCOUNT
+-- ========================
+CREATE TABLE account (
+    account_id INT IDENTITY PRIMARY KEY,
+    username NVARCHAR(100) UNIQUE NOT NULL,
+    password_hash NVARCHAR(255) NOT NULL,
+    full_name NVARCHAR(150) NOT NULL,
+    role_name NVARCHAR(30) NOT NULL,
+    status NVARCHAR(20) DEFAULT 'ACTIVE' NOT NULL
+);
+
+-- ========================
+-- STAFF
+-- ========================
+CREATE TABLE staff (
+    account_id INT PRIMARY KEY,
+    staff_id INT UNIQUE NOT NULL,
+    manager_admin_account_id INT NULL,
+    FOREIGN KEY (account_id) REFERENCES account(account_id)
+);
+
+-- ========================
+-- ADMIN
+-- ========================
+CREATE TABLE admin (
+    account_id INT PRIMARY KEY,
+    FOREIGN KEY (account_id) REFERENCES staff(account_id)
+);
+
+ALTER TABLE staff
+ADD CONSTRAINT fk_staff_admin
+FOREIGN KEY (manager_admin_account_id) REFERENCES admin(account_id);
+
+-- ========================
+-- CUSTOMER
+-- ========================
+CREATE TABLE customer (
+    customer_id INT IDENTITY PRIMARY KEY,
+    customer_name NVARCHAR(150),
+    phone NVARCHAR(20),
+    address NVARCHAR(255)
+);
+
+-- ========================
+-- CATEGORY
+-- ========================
+CREATE TABLE category (
+    category_id INT IDENTITY PRIMARY KEY,
+    category_name NVARCHAR(100)
+);
+
+-- ========================
+-- PRODUCT
+-- ========================
+CREATE TABLE product (
+    product_id INT IDENTITY PRIMARY KEY,
+    product_code NVARCHAR(50) UNIQUE,
+    product_name NVARCHAR(150),
+    base_price DECIMAL(15,2),
+    detail NVARCHAR(MAX),
+    category_id INT,
+    FOREIGN KEY (category_id) REFERENCES category(category_id)
+);
+
+-- ========================
+-- PRODUCT ATTRIBUTE
+-- ========================
+CREATE TABLE product_attribute (
+    attribute_id INT IDENTITY PRIMARY KEY,
+    product_id INT NOT NULL,
+    attribute_name NVARCHAR(100),
+    attribute_value NVARCHAR(255),
+    FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+-- ========================
+-- PRODUCT IMAGE
+-- ========================
+CREATE TABLE product_image (
+    image_id INT IDENTITY PRIMARY KEY,
+    product_id INT NOT NULL,
+    image_url NVARCHAR(500),
+    is_primary BIT DEFAULT 0,
+    display_order INT DEFAULT 0,
+    FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+-- ========================
+-- INVENTORY
+-- ========================
+CREATE TABLE inventory (
+    inventory_id INT IDENTITY PRIMARY KEY,
+    quantity_stock INT,
+    product_id INT UNIQUE,
+    FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+-- ========================
+-- SUPPLIER
+-- ========================
+CREATE TABLE supplier (
+    supplier_id INT IDENTITY PRIMARY KEY,
+    supplier_name NVARCHAR(150),
+    phone NVARCHAR(20),
+    address NVARCHAR(255)
+);
+
+-- ========================
+-- IMPORT RECEIPT
+-- ========================
+CREATE TABLE import_receipt (
+    receipt_id INT IDENTITY PRIMARY KEY,
+    import_date DATETIME,
+    total_cost DECIMAL(15,2),
+    supplier_id INT,
+    staff_account_id INT,
+    FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
+    FOREIGN KEY (staff_account_id) REFERENCES staff(account_id)
+);
+
+-- ========================
+-- IMPORT DETAIL
+-- ========================
+CREATE TABLE import_detail (
+    detail_id INT IDENTITY PRIMARY KEY,
+    quantity INT,
+    import_price DECIMAL(15,2),
+    receipt_id INT,
+    product_id INT,
+    FOREIGN KEY (receipt_id) REFERENCES import_receipt(receipt_id),
+    FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+-- ========================
+-- VOUCHER
+-- ========================
+CREATE TABLE voucher (
+    voucher_id INT IDENTITY PRIMARY KEY,
+    code NVARCHAR(50),
+    discount_value DECIMAL(15,2),
+    description NVARCHAR(255),
+    start_date DATETIME,
+    end_date DATETIME
+);
+
+-- ========================
+-- ORDERS
+-- ========================
+CREATE TABLE orders (
+    order_id INT IDENTITY PRIMARY KEY,
+    order_number NVARCHAR(50),
+    order_date DATETIME,
+    status NVARCHAR(30),
+    final_total DECIMAL(15,2),
+    customer_id INT,
+    staff_account_id INT,
+    voucher_id INT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
+    FOREIGN KEY (staff_account_id) REFERENCES staff(account_id),
+    FOREIGN KEY (voucher_id) REFERENCES voucher(voucher_id)
+);
+
+-- ========================
+-- ORDER DETAIL
+-- ========================
+CREATE TABLE order_detail (
+    order_detail_id INT IDENTITY PRIMARY KEY,
+    quantity INT,
+    unit_price DECIMAL(15,2),
+    order_id INT,
+    product_id INT,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+-- ========================
+-- PAYMENT
+-- ========================
+CREATE TABLE payment (
+    payment_id INT IDENTITY PRIMARY KEY,
+    method NVARCHAR(50),
+    order_id INT UNIQUE,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+);
+
+-- ========================
+-- OTP VERIFICATION
+-- ========================
+CREATE TABLE otp_verification (
+    otp_id INT IDENTITY PRIMARY KEY,
+    email NVARCHAR(255) UNIQUE NOT NULL,
+    otp_code NVARCHAR(10) NOT NULL,
+    full_name NVARCHAR(150) NOT NULL,
+    username NVARCHAR(100) NOT NULL,
+    password_hash NVARCHAR(255) NOT NULL,
+    is_verified BIT DEFAULT 0 NOT NULL,
+    created_at DATETIME DEFAULT GETDATE() NOT NULL,
+    expires_at DATETIME NOT NULL,
+    CONSTRAINT chk_otp_code_length CHECK (LEN(otp_code) = 6)
+);
+
+-- ========================
+-- INVENTORY AUDIT LOG
+-- ========================
+CREATE TABLE inventory_audit_log (
+    log_id INT IDENTITY PRIMARY KEY,
+    inventory_id INT,
+    quantity_before INT,
+    quantity_after INT,
+    action NVARCHAR(100),
+    changed_by INT,
+    changed_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (inventory_id) REFERENCES inventory(inventory_id),
+    FOREIGN KEY (changed_by) REFERENCES staff(account_id)
+);
+
+-- ========================
+-- INVENTORY LOW STOCK ALERT
+-- ========================
+CREATE TABLE inventory_low_stock_alert (
+    alert_id INT IDENTITY PRIMARY KEY,
+    product_id INT,
+    current_quantity INT,
+    threshold_quantity INT,
+    alert_date DATETIME DEFAULT GETDATE(),
+    is_resolved BIT DEFAULT 0,
+    FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+-- ========================
+-- SEED DATA (CHUẨN KHÔNG LỖI)
+-- ========================
+
+-- ACCOUNT
+INSERT INTO account (username, password_hash, full_name, role_name, status) VALUES
+(N'admin', N'123', N'Admin', N'ADMIN', N'ACTIVE'),
+(N'staff1', N'123', N'Staff 1', N'STAFF', N'ACTIVE');
+
+-- STAFF
+INSERT INTO staff VALUES
+(1, 1000, NULL),
+(2, 1001, NULL);
+
+-- ADMIN
+INSERT INTO admin VALUES (1);
+
+-- UPDATE MANAGER
+UPDATE staff SET manager_admin_account_id = 1 WHERE account_id = 2;
+
+-- CUSTOMER
+INSERT INTO customer VALUES
+(N'Pham Thi A', '0909000111', N'Q1'),
+(N'Hoang Van B', '0911222333', N'Q7');
+
+-- CATEGORY
+INSERT INTO category VALUES
+(N'Ring'),
+(N'Necklace');
+
+-- PRODUCT
+INSERT INTO product VALUES
+(N'R001', N'Nhẫn Vàng 18K', 5500000, N'Nhẫn vàng cao cấp', 1),
+(N'R002', N'Nhẫn Kim Cương', 12500000, N'Nhẫn kim cương', 1),
+(N'N001', N'Dây chuyền', 8900000, N'Dây chuyền đẹp', 2);
+
+-- PRODUCT ATTRIBUTE
+INSERT INTO product_attribute VALUES
+(1, N'Chất liệu', N'Vàng 18K'),
+(1, N'Size', N'7'),
+(2, N'Đá', N'Kim cương'),
+(3, N'Chiều dài', N'45cm');
+
+-- PRODUCT IMAGE
+INSERT INTO product_image VALUES
+(1, N'https://cdn.pnj.io/images/detailed/181/sp-GN0000Y000391-nhan-cuoi-nam-vang-18k-pnj-1.png', 1, 1),
+(1, N'https://cdn.pnj.io/images/detailed/181/sp-GN0000Y000391-nhan-cuoi-nam-vang-18k-pnj-2.png', 0, 2),
+(2, N'https://cdn.pnj.io/images/detailed/290/sp-gvddddw001279-vong-tay-kim-cuong-vang-trang-585-14k-pnj-timeless-diamond-01.png', 1, 1),
+(2, N'https://cdn.pnj.io/images/detailed/290/sp-gvddddw001279-vong-tay-kim-cuong-vang-trang-585-14k-pnj-timeless-diamond-02.png', 0, 2),
+(3, N'https://cdn.pnj.io/images/detailed/284/sp-gd0000y013147-day-chuyen-nam-vang-99-mancode-by-pnj-uy-ma-kim-linh-100.png', 1, 1),
+(3, N'https://cdn.pnj.io/images/detailed/284/sp-gd0000y013147-day-chuyen-nam-vang-99-mancode-by-pnj-uy-ma-kim-linh-200.png', 0, 2);
+
+-- INVENTORY
+INSERT INTO inventory VALUES
+(20, 1),
+(10, 2),
+(15, 3);
+
+-- EXTRA PRODUCTS (FOR REPORTING DATA)
+INSERT INTO product VALUES
+(N'R003', N'Nhẫn Emerald', 6700000, N'Nhẫn đá emerald sang trọng', 1),
+(N'R004', N'Nhẫn Ruby', 7200000, N'Nhẫn ruby cao cấp', 1),
+(N'N002', N'Dây chuyền Aurora', 9300000, N'Dây chuyền thiết kế hiện đại', 2),
+(N'N003', N'Dây chuyền Classic', 8100000, N'Dây chuyền phong cách cổ điển', 2),
+(N'R005', N'Nhẫn Platinum P1', 11800000, N'Nhẫn bạch kim tinh xảo', 1),
+(N'N004', N'Dây chuyền Moonlight', 7600000, N'Dây chuyền ánh bạc thanh lịch', 2),
+(N'R006', N'Nhẫn Opal O2', 6900000, N'Nhẫn opal thời trang', 1);
+
+INSERT INTO product_attribute VALUES
+(4, N'Chất liệu', N'Vàng trắng 18K'),
+(5, N'Chất liệu', N'Vàng 18K'),
+(6, N'Chiều dài', N'42cm'),
+(7, N'Chiều dài', N'40cm'),
+(8, N'Chất liệu', N'Bạch kim'),
+(9, N'Chiều dài', N'46cm'),
+(10, N'Đá', N'Opal');
+
+INSERT INTO inventory VALUES
+(6, 4),
+(12, 5),
+(4, 6),
+(0, 7),
+(8, 8),
+(25, 9),
+(11, 10);
+
+-- SUPPLIER
+INSERT INTO supplier VALUES
+(N'Gold Supplier', '0909999999', N'HCM');
+
+-- IMPORT RECEIPT
+INSERT INTO import_receipt VALUES
+(GETDATE(), 50000000, 1, 2);
+
+-- IMPORT DETAIL
+INSERT INTO import_detail VALUES
+(10, 4000000, 1, 1);
+
+-- VOUCHER
+INSERT INTO voucher (code, discount_value, description, start_date, end_date) VALUES
+(N'SALE10', 100000, N'Giảm trực tiếp cho đơn hàng cơ bản', DATEADD(DAY, -7, GETDATE()), DATEADD(DAY, 30, GETDATE())),
+(N'SALE20', 200000, N'Ưu đãi giảm mạnh cho sản phẩm vàng', DATEADD(DAY, -3, GETDATE()), DATEADD(DAY, 20, GETDATE())),
+(N'DISCOUNT50', 50000, N'Voucher khuyến mãi nhanh cuối tuần', DATEADD(DAY, -1, GETDATE()), DATEADD(DAY, 10, GETDATE()));
+
+-- ORDERS
+INSERT INTO orders VALUES
+(N'ORD001', GETDATE(), N'PAID', 15000000, 1, 2, 1);
+
+-- ORDER DETAIL
+INSERT INTO order_detail VALUES
+(1, 5500000, 1, 1);
+
+-- PAYMENT
+INSERT INTO payment VALUES
+(N'CASH', 1);
+
+-- EXTRA ORDERS (FOR DASHBOARD CHARTS)
+DECLARE @productCount INT = (SELECT COUNT(*) FROM product);
+DECLARE @i INT = 2;
+WHILE @i <= 90
+BEGIN
+    DECLARE @orderDate DATETIME = DATEADD(DAY, -@i, GETDATE());
+    DECLARE @status NVARCHAR(30) = CASE WHEN @i % 11 = 0 THEN N'CANCELLED' ELSE N'PAID' END;
+    DECLARE @customerId INT = CASE WHEN @i % 2 = 0 THEN 1 ELSE 2 END;
+    DECLARE @voucherId INT = CASE WHEN @i % 6 = 0 THEN 1 WHEN @i % 10 = 0 THEN 2 ELSE NULL END;
+
+    INSERT INTO orders(order_number, order_date, status, final_total, customer_id, staff_account_id, voucher_id)
+    VALUES (
+        N'ORD' + RIGHT('000' + CAST(@i AS NVARCHAR(3)), 3),
+        @orderDate,
+        @status,
+        0,
+        @customerId,
+        2,
+        @voucherId
+    );
+
+    DECLARE @orderId INT = SCOPE_IDENTITY();
+    DECLARE @product1 INT = ((@i - 1) % @productCount) + 1;
+    DECLARE @qty1 INT = (@i % 4) + 1;
+    DECLARE @price1 DECIMAL(15,2) = ISNULL((SELECT base_price FROM product WHERE product_id = @product1), 1000000);
+
+    INSERT INTO order_detail(quantity, unit_price, order_id, product_id)
+    VALUES (@qty1, @price1, @orderId, @product1);
+
+    IF (@i % 2 = 0)
+    BEGIN
+        DECLARE @product2 INT = ((@i + 2) % @productCount) + 1;
+        DECLARE @qty2 INT = (@i % 3) + 1;
+        DECLARE @price2 DECIMAL(15,2) = ISNULL((SELECT base_price FROM product WHERE product_id = @product2), 1000000);
+
+        INSERT INTO order_detail(quantity, unit_price, order_id, product_id)
+        VALUES (@qty2, @price2, @orderId, @product2);
+    END
+
+    DECLARE @orderTotal DECIMAL(15,2) = (
+        SELECT SUM(quantity * unit_price)
+        FROM order_detail
+        WHERE order_id = @orderId
+    );
+
+    UPDATE orders
+    SET final_total = ISNULL(@orderTotal, 0)
+    WHERE order_id = @orderId;
+
+    IF (@status = N'PAID')
+    BEGIN
+        INSERT INTO payment(method, order_id)
+        VALUES (
+            CASE
+                WHEN @i % 3 = 0 THEN N'CARD'
+                WHEN @i % 3 = 1 THEN N'CASH'
+                ELSE N'BANK'
+            END,
+            @orderId
+        );
+    END
+
+    SET @i = @i + 1;
+END
+
+UPDATE product
+SET detail = N'Nhẫn vàng 18K cao cấp được chế tác tinh xảo với độ hoàn thiện cao, mang lại vẻ đẹp sang trọng và đẳng cấp cho người đeo. Sản phẩm sử dụng vàng 18K với độ bền tốt, màu sắc sáng bóng lâu dài và không bị xỉn màu theo thời gian. Thiết kế tối giản nhưng tinh tế, phù hợp cho nhiều dịp như đi làm, dự tiệc hoặc làm quà tặng. Nhẫn có trọng lượng vừa phải, đeo thoải mái trong thời gian dài mà không gây khó chịu.'
+WHERE product_id = 1;
+
+UPDATE product
+SET detail = N'Nhẫn kim cương cao cấp được đính đá kim cương tự nhiên với độ sáng vượt trội, mang lại vẻ đẹp lấp lánh và sang trọng. Phần thân nhẫn được làm từ vàng chất lượng cao, đảm bảo độ bền và độ chắc chắn. Sản phẩm phù hợp làm trang sức cao cấp hoặc nhẫn cầu hôn, thể hiện sự đẳng cấp và tinh tế của người sở hữu. Thiết kế hiện đại, phù hợp với xu hướng thời trang hiện nay.'
+WHERE product_id = 2;
+
+UPDATE product
+SET detail = N'Dây chuyền vàng trắng được thiết kế thanh lịch và nhẹ nhàng, phù hợp với nhiều phong cách thời trang khác nhau. Sản phẩm có độ hoàn thiện cao, bề mặt sáng bóng và chống oxy hóa tốt. Với chiều dài tiêu chuẩn, dây chuyền dễ dàng kết hợp với nhiều loại trang phục từ công sở đến dạo phố. Đây là lựa chọn lý tưởng cho những ai yêu thích sự tinh tế và sang trọng.'
+WHERE product_id = 3;
+
+
+GO
+
+PRINT N'✔ FULL DATABASE OK (ATTRIBUTE + IMAGE + DETAIL)';

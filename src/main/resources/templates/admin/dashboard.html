@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng điều khiển quản trị</title>
+    <link rel="stylesheet" th:href="@{/css/admin/dashboard.css(v='20260414-2')}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script th:src="@{/js/admin/dashboard-reports.js(v='20260414-2')}" defer></script>
+</head>
+<body>
+<div class="admin-layout">
+    <aside th:replace="~{fragments/header :: managementSidebar('dashboard')}"></aside>
+
+    <main class="admin-main">
+        <header th:replace="~{fragments/header :: managementTopbar('Báo cáo & Thống kê')}"></header>
+
+        <section class="filters-panel card-panel">
+            <form id="reportFilterForm" class="filters-form" autocomplete="off">
+                <div class="filter-field">
+                    <label for="reportType">Loại báo cáo</label>
+                    <select id="reportType" name="reportType">
+                        <option value="revenue">Doanh thu</option>
+                        <option value="top-products">Top sản phẩm</option>
+                        <option value="inventory">Tồn kho</option>
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label for="timeType">Loại thời gian</label>
+                    <select id="timeType" name="timeType">
+                        <option value="day">Ngày</option>
+                        <option value="month">Tháng</option>
+                        <option value="year">Năm</option>
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label for="startDate">Ngày bắt đầu</label>
+                    <input id="startDate" name="startDate" type="date">
+                </div>
+                <div class="filter-field">
+                    <label for="endDate">Ngày kết thúc</label>
+                    <input id="endDate" name="endDate" type="date">
+                </div>
+                <button class="apply-btn" type="submit">Áp dụng</button>
+            </form>
+        </section>
+
+        <section class="kpi-grid" id="kpiGrid"></section>
+
+        <section class="charts-grid">
+            <article class="card-panel chart-card">
+                <div class="chart-head">
+                    <h3 id="primaryChartTitle">Biểu đồ chính</h3>
+                    <p id="primaryChartSubtitle">Dữ liệu theo bộ lọc</p>
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="primaryChart"></canvas>
+                </div>
+            </article>
+            <article class="card-panel chart-card">
+                <div class="chart-head">
+                    <h3 id="secondaryChartTitle">Biểu đồ phụ</h3>
+                    <p id="secondaryChartSubtitle">Dữ liệu bổ sung</p>
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="secondaryChart"></canvas>
+                </div>
+            </article>
+        </section>
+
+        <section class="card-panel table-panel">
+            <div class="table-head">
+                <h3 id="tableTitle">Bảng dữ liệu</h3>
+                <p id="tableSubtitle">Chi tiết theo bộ lọc hiện tại</p>
+            </div>
+            <div class="table-wrap" id="tableWrap">
+                <table id="detailTable">
+                    <thead id="detailTableHead"></thead>
+                    <tbody id="detailTableBody"></tbody>
+                </table>
+            </div>
+            <div class="empty-state" id="emptyState" hidden>
+                <p>Không có dữ liệu</p>
+            </div>
+            <div class="table-footer" id="tableFooter">
+                <button type="button" class="page-btn" id="prevPageBtn">Trang trước</button>
+                <span id="pageInfo">1 / 1</span>
+                <button type="button" class="page-btn" id="nextPageBtn">Trang sau</button>
+            </div>
+        </section>
+
+        <div class="loading-overlay" id="loadingOverlay" hidden>
+            <div class="loading-box">
+                <div class="spinner"></div>
+                <p>Đang tải dữ liệu báo cáo...</p>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+            /*<![CDATA[*/
+            window.dashboardData = /*[[${dashboardData}]]*/ {
+                orders: [],
+                orderDetails: [],
+                inventory: []
+            };
+            /*]]>*/
+        </script>
+    </main>
+</div>
+</body>
+</html>
